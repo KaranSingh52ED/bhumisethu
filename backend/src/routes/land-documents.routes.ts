@@ -15,6 +15,7 @@ import {
   requireRole,
 } from '../middleware/auth';
 import { LandOwnerDocumentModel } from '../models/land-owner-document.model';
+import { predictDocumentScore } from '../utils/predictedDocumentScore';
 
 const router = Router();
 
@@ -53,6 +54,7 @@ type SubmissionLean = {
   mimeType: string;
   sizeBytes: number;
   status: string;
+  predictedScore?: number | null;
   adminScore?: number | null;
   adminNote?: string;
   reviewedAt?: Date | null;
@@ -70,6 +72,7 @@ const toSubmissionDto = (doc: SubmissionLean) => ({
   mimeType: doc.mimeType,
   sizeBytes: doc.sizeBytes,
   status: doc.status,
+  predictedScore: doc.predictedScore ?? null,
   adminScore: doc.adminScore ?? null,
   adminNote: doc.adminNote ?? '',
   reviewedAt: doc.reviewedAt ?? null,
@@ -154,6 +157,12 @@ router.post(
     const storedFileName = path.basename(req.file.filename || req.file.path);
     const uploadsDir = getUploadsDir();
     const absolutePath = path.join(uploadsDir, storedFileName);
+    const predictedScore = predictDocumentScore({
+      documentKey,
+      selectedType,
+      mimeType: req.file.mimetype,
+      sizeBytes: req.file.size,
+    });
 
     const existing = await LandOwnerDocumentModel.findOne({
       landOwnerGoogleId: googleId,
@@ -178,6 +187,7 @@ router.post(
         originalFileName: req.file.originalname,
         mimeType: req.file.mimetype,
         sizeBytes: req.file.size,
+        predictedScore,
         status: 'pending_review',
         adminScore: null,
         adminNote: '',

@@ -143,7 +143,11 @@ export function LandOwnerDocumentsSection({ token }: Props) {
                     </td>
                     <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>{statusLabel}</td>
                     <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
-                      {sub?.status === 'approved' && sub.adminScore != null ? sub.adminScore : '—'}
+                      {sub?.status === 'approved' && sub.adminScore != null
+                        ? sub.adminScore
+                        : sub?.predictedScore != null
+                          ? `${sub.predictedScore} predicted`
+                          : '—'}
                     </td>
                     <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>

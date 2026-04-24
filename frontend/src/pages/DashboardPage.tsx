@@ -305,6 +305,10 @@ export function DashboardPage() {
                               >
                                 {l.cumulativeScore}
                               </span>
+                            ) : l.predictedKylScore != null ? (
+                              <span className="kyl-mini">
+                                Expected {l.predictedKylScore}
+                              </span>
                             ) : (
                               <span className="kyl-mini kyl-mini--na">—</span>
                             )}

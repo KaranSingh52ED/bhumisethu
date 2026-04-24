@@ -8,6 +8,7 @@ export type ListingKylItem = {
   originalFileName: string;
   mimeType: string;
   sizeBytes: number;
+  predictedScore?: number | null;
   adminScore: number | null;
   adminNote: string;
   reviewedAt: Date | null;

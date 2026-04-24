@@ -73,8 +73,12 @@ export function AdminListingReviewSection({ token }: Props) {
         data.firstPendingDocumentKey ??
         data.docs.find((d) => d.reviewStatus === 'pending')?.id ??
         null;
+      const firstDoc = data.docs.find((d) => d.id === first) ?? null;
       setFocusDocKey((prev) => ({ ...prev, [id]: first }));
-      setApproveScore((prev) => ({ ...prev, [id]: '80' }));
+      setApproveScore((prev) => ({
+        ...prev,
+        [id]: firstDoc?.predictedScore != null ? String(firstDoc.predictedScore) : '80',
+      }));
       setRejectNote((prev) => ({ ...prev, [id]: '' }));
     } catch (e) {
       setDocsState((prev) => ({
@@ -88,6 +92,8 @@ export function AdminListingReviewSection({ token }: Props) {
     listingId: string,
     res: Awaited<ReturnType<typeof reviewListingDocument>>,
   ) => {
+    const nextDoc =
+      docsState[listingId]?.data?.docs.find((d) => d.id === res.nextPendingDocumentKey) ?? null;
     setDocsState((prev) => {
       const existing = prev[listingId];
       if (!existing?.data) return prev;
@@ -119,7 +125,10 @@ export function AdminListingReviewSection({ token }: Props) {
       ),
     );
     setFocusDocKey((prev) => ({ ...prev, [listingId]: res.nextPendingDocumentKey }));
-    setApproveScore((prev) => ({ ...prev, [listingId]: '80' }));
+    setApproveScore((prev) => ({
+      ...prev,
+      [listingId]: nextDoc?.predictedScore != null ? String(nextDoc.predictedScore) : '80',
+    }));
     setRejectNote((prev) => ({ ...prev, [listingId]: '' }));
   };
 
@@ -292,6 +301,11 @@ export function AdminListingReviewSection({ token }: Props) {
                                     <p className="admin-kyl-doc__file">
                                       {focusedDoc.originalFileName}
                                     </p>
+                                    {focusedDoc.predictedScore != null ? (
+                                      <p className="admin-kyl-doc__badge">
+                                        Predicted score: {focusedDoc.predictedScore}/100
+                                      </p>
+                                    ) : null}
                                     <div className="admin-kyl-review-focus__row">
                                       <button
                                         type="button"
@@ -388,6 +402,8 @@ export function AdminListingReviewSection({ token }: Props) {
                                               [listing.id]:
                                                 doc.adminScore != null
                                                   ? String(doc.adminScore)
+                                                  : doc.predictedScore != null
+                                                    ? String(doc.predictedScore)
                                                   : '80',
                                             }));
                                             setRejectNote((p) => ({ ...p, [listing.id]: '' }));
@@ -420,6 +436,10 @@ export function AdminListingReviewSection({ token }: Props) {
                                               style={{ color: scoreColor(doc.adminScore) }}
                                             >
                                               Score {doc.adminScore}/100
+                                            </p>
+                                          ) : doc.predictedScore != null ? (
+                                            <p className="admin-kyl-doc__badge">
+                                              Predicted {doc.predictedScore}/100
                                             </p>
                                           ) : null}
                                           {doc.reviewStatus === 'rejected' && doc.adminNote ? (

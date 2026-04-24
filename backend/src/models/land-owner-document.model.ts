@@ -13,6 +13,7 @@ const landOwnerDocumentSchema = new Schema(
     originalFileName: { type: String, required: true },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
+    predictedScore: { type: Number, min: 0, max: 100, default: null },
     status: {
       type: String,
       enum: submissionStatuses,

@@ -34,6 +34,8 @@ export interface MyListing {
   status: string;
   cumulativeScore: number | null;
   scoredDocCount: number;
+  predictedKylScore: number | null;
+  predictedScoredDocCount: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -50,6 +52,7 @@ export interface ListingDocumentSubmissionDto {
   originalFileName: string;
   mimeType: string;
   sizeBytes: number;
+  predictedScore: number | null;
   adminScore: number | null;
   /** Admin workflow; landowner sees rejection notes via `adminNote`. */
   adminNote: string;
@@ -64,6 +67,8 @@ export interface ListingDocumentsResponse {
   listingStatus: string;
   cumulativeScore: number | null;
   scoredDocCount: number;
+  predictedKylScore: number | null;
+  predictedScoredDocCount: number;
   /** Total required categories in the KYL catalog. */
   kylRequiredTotal?: number;
   totalUploaded: number;
@@ -126,7 +131,7 @@ export interface ScoreDocumentResponse {
 
 export interface ReviewDocumentPayload {
   action: 'approve' | 'reject';
-  /** Defaults to 80 on approve when omitted. */
+  /** Defaults to the predicted score, or 80 when no prediction exists. */
   score?: number;
   /** Required for reject (min 3 chars). Optional on approve. */
   note?: string;
@@ -278,6 +283,8 @@ export const uploadListingDocument = async (
   listingStatus: string;
   cumulativeScore: number | null;
   scoredDocCount: number;
+  predictedKylScore: number | null;
+  predictedScoredDocCount: number;
 }> => {
   const body = new FormData();
   body.append('documentKey', documentKey);
@@ -295,6 +302,8 @@ export const uploadListingDocument = async (
     listingStatus: string;
     cumulativeScore: number | null;
     scoredDocCount: number;
+    predictedKylScore: number | null;
+    predictedScoredDocCount: number;
   }>(response);
 };
 

@@ -76,6 +76,8 @@ export function ListingDocumentsChecklist({ token, listingId }: Props) {
   const requiredTotal = data.items.filter((i) => !i.optional).length;
   const requiredDone = data.items.filter((i) => !i.optional && i.submission).length;
   const isSubmitted = data.listingStatus === 'submitted';
+  const expectedKyl =
+    data.predictedKylScore != null ? Math.round(data.predictedKylScore * 10) / 10 : null;
 
   return (
     <div className="listing-doc-checklist">
@@ -87,6 +89,12 @@ export function ListingDocumentsChecklist({ token, listingId }: Props) {
             {requiredDone} / {requiredTotal}
           </strong>{' '}
           · Total uploaded: {data.totalUploaded}
+          {expectedKyl != null ? (
+            <>
+              {' '}
+              · Expected KYL before approval: <strong>{expectedKyl}/100</strong>
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -137,7 +145,10 @@ export function ListingDocumentsChecklist({ token, listingId }: Props) {
                         ✓ Reviewed{sub.adminScore != null ? ` (${sub.adminScore}/100)` : ''}
                       </span>
                     ) : (
-                      <span className="listing-doc-card__status--warn">Awaiting admin review</span>
+                      <span className="listing-doc-card__status--warn">
+                        Awaiting admin review
+                        {sub.predictedScore != null ? ` · Predicted ${sub.predictedScore}/100` : ''}
+                      </span>
                     )
                   ) : (
                     <span className="listing-doc-card__status--pending">Pending upload</span>
@@ -147,6 +158,12 @@ export function ListingDocumentsChecklist({ token, listingId }: Props) {
                 {sub ? (
                   <p className="listing-doc-card__uploaded-info">
                     <strong>{sub.typeLabel}</strong> — {sub.originalFileName}
+                    {reviewState !== 'approved' && sub.predictedScore != null ? (
+                      <>
+                        <br />
+                        Predicted score before admin approval: <strong>{sub.predictedScore}/100</strong>
+                      </>
+                    ) : null}
                   </p>
                 ) : null}
 

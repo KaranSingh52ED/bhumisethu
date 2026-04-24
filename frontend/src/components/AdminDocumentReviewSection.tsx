@@ -21,6 +21,15 @@ export function AdminDocumentReviewSection({ token }: Props) {
     try {
       const submissions = await fetchAdminPendingDocuments(token);
       setList(submissions);
+      setScores((prev) => {
+        const next = { ...prev };
+        for (const submission of submissions) {
+          if (next[submission.id] == null && submission.predictedScore != null) {
+            next[submission.id] = String(submission.predictedScore);
+          }
+        }
+        return next;
+      });
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load queue.');
@@ -92,6 +101,9 @@ export function AdminDocumentReviewSection({ token }: Props) {
                   <p className="admin-doc-row__meta">
                     Owner: {s.landOwnerGoogleId.slice(0, 12)}… · {s.originalFileName}
                   </p>
+                  {s.predictedScore != null ? (
+                    <p className="admin-kyl-doc__badge">Predicted score: {s.predictedScore}/100</p>
+                  ) : null}
                   <div className="admin-doc-row__actions">
                     <button
                       type="button"

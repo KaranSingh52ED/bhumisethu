@@ -152,6 +152,8 @@ export function ProfileListingKylSection({ token }: Props) {
               {data ? (
                 <span className="profile-listing-kyl-agg">
                   Avg. KYL {data.cumulativeScore != null ? data.cumulativeScore : '—'} ·{' '}
+                  Expected{' '}
+                  {data.predictedKylScore != null ? `${data.predictedKylScore}/100` : '—'} ·{' '}
                   {data.scoredDocCount} of {data.kylRequiredTotal ?? '—'} required approved
                 </span>
               ) : null}
@@ -202,7 +204,9 @@ export function ProfileListingKylSection({ token }: Props) {
                           <td>
                             {sub?.reviewStatus === 'approved' && sub.adminScore != null
                               ? sub.adminScore
-                              : '—'}
+                              : sub?.predictedScore != null
+                                ? `${sub.predictedScore} predicted`
+                                : '—'}
                           </td>
                           <td className="profile-lkyl-note-cell">
                             {sub?.reviewStatus === 'rejected' && sub.adminNote

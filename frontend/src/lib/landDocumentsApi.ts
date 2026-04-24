@@ -22,6 +22,7 @@ export interface DocumentSubmissionDto {
   mimeType: string;
   sizeBytes: number;
   status: string;
+  predictedScore: number | null;
   adminScore: number | null;
   adminNote: string;
   reviewedAt: string | null;

@@ -27,6 +27,7 @@ import {
   kylRecordToScoreRows,
   type ListingKylItem,
 } from '../utils/listingKyl';
+import { predictDocumentScore } from '../utils/predictedDocumentScore';
 
 const router = Router();
 
@@ -72,6 +73,7 @@ const toListingDocDto = (documentKey: string, item: ListingKylItem) => {
     originalFileName: item.originalFileName,
     mimeType: item.mimeType,
     sizeBytes: item.sizeBytes,
+    predictedScore: item.predictedScore ?? null,
     adminScore: item.adminScore ?? null,
     adminNote: item.adminNote ?? '',
     reviewStatus: effectiveReviewStatus(item),
@@ -121,6 +123,27 @@ const kylFromDocs = (
 ) => {
   const m = computeListingKYLMetrics(docs);
   return { cumulativeScore: m.kylScore, scoredCount: m.scoredRequiredCount };
+};
+
+const predictedKylFromDocs = (docs: Record<string, ListingKylItem>) => {
+  const requiredKeys = getRequiredDocumentKeys();
+  const scored: number[] = [];
+  for (const [documentKey, item] of Object.entries(docs)) {
+    if (!requiredKeys.has(documentKey)) continue;
+    if (effectiveReviewStatus(item) === 'rejected') continue;
+    const score = item.adminScore ?? item.predictedScore;
+    if (score != null && !Number.isNaN(score)) scored.push(score);
+  }
+
+  if (scored.length === 0) {
+    return { predictedKylScore: null, predictedScoredDocCount: 0 };
+  }
+
+  const sum = scored.reduce((acc, score) => acc + score, 0);
+  return {
+    predictedKylScore: Math.round((sum / scored.length) * 10) / 10,
+    predictedScoredDocCount: scored.length,
+  };
 };
 
 const assertListingOwner = async (
@@ -213,18 +236,22 @@ router.get('/mine', ...landOwnerChain, async (req, res) => {
   }
 
   const scoreByListing = new Map<string, ReturnType<typeof kylFromDocs>>();
+  const predictedScoreByListing = new Map<string, ReturnType<typeof predictedKylFromDocs>>();
   for (const row of rows) {
     const id = String(row._id);
-    const docs = kylRecordToScoreRows(
+    const kyl = kylMapToRecord(
       (row as { kylDocuments?: LandListingLean['kylDocuments'] }).kylDocuments,
     );
+    const docs = kylRecordToScoreRows(kyl);
     scoreByListing.set(id, kylFromDocs(docs));
+    predictedScoreByListing.set(id, predictedKylFromDocs(kyl));
   }
 
   return res.json({
     listings: rows.map((l) => {
       const id = String(l._id);
       const score = scoreByListing.get(id);
+      const predictedScore = predictedScoreByListing.get(id);
       return {
         id,
         title: l.title,
@@ -236,6 +263,8 @@ router.get('/mine', ...landOwnerChain, async (req, res) => {
         status: l.status,
         cumulativeScore: score?.cumulativeScore ?? null,
         scoredDocCount: score?.scoredCount ?? 0,
+        predictedKylScore: predictedScore?.predictedKylScore ?? null,
+        predictedScoredDocCount: predictedScore?.predictedScoredDocCount ?? 0,
         createdAt: l.createdAt,
         updatedAt: l.updatedAt,
       };
@@ -456,6 +485,7 @@ router.get('/:listingId/documents', ...landOwnerChain, async (req, res) => {
   const kyl = kylMapToRecord(check.listing.kylDocuments);
   const scoreRows = kylRecordToScoreRows(kyl);
   const kylMetrics = computeListingKYLMetrics(scoreRows);
+  const predictedMetrics = predictedKylFromDocs(kyl);
   const catalog = getDocumentCatalog();
 
   const items = catalog.map((entry) => {
@@ -478,6 +508,8 @@ router.get('/:listingId/documents', ...landOwnerChain, async (req, res) => {
     listingStatus: check.listing.status,
     cumulativeScore: kylMetrics.kylScore,
     scoredDocCount: kylMetrics.scoredRequiredCount,
+    predictedKylScore: predictedMetrics.predictedKylScore,
+    predictedScoredDocCount: predictedMetrics.predictedScoredDocCount,
     kylRequiredTotal: kylMetrics.requiredCategoryCount,
     totalUploaded: countKylUploads(check.listing.kylDocuments),
     items,
@@ -554,12 +586,19 @@ router.post(
     }
 
     const now = new Date();
+    const predictedScore = predictDocumentScore({
+      documentKey,
+      selectedType,
+      mimeType: req.file.mimetype,
+      sizeBytes: req.file.size,
+    });
     const newItem: ListingKylItem = {
       typeLabel: selectedType,
       storedFileName,
       originalFileName: req.file.originalname,
       mimeType: req.file.mimetype,
       sizeBytes: req.file.size,
+      predictedScore,
       adminScore: null,
       adminNote: '',
       reviewedAt: null,
@@ -582,6 +621,7 @@ router.post(
     const allDocs = kylRecordToScoreRows(kylAfter);
 
     const { cumulativeScore, scoredCount } = kylFromDocs(allDocs);
+    const predictedMetrics = predictedKylFromDocs(kylAfter);
 
     return res.status(201).json({
       submission: toListingDocDto(documentKey, newItem),
@@ -589,6 +629,8 @@ router.post(
       listingStatus: updated.status,
       cumulativeScore,
       scoredDocCount: scoredCount,
+      predictedKylScore: predictedMetrics.predictedKylScore,
+      predictedScoredDocCount: predictedMetrics.predictedScoredDocCount,
     });
   },
 );
@@ -807,7 +849,7 @@ router.patch('/admin/:listingId/docs/:documentKey/review', ...adminChain, async 
   } else {
     let scoreNum: number;
     if (score === undefined || score === null || score === '') {
-      scoreNum = 80;
+      scoreNum = kylBefore[documentKey].predictedScore ?? 80;
     } else {
       scoreNum = Number(score);
       if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {

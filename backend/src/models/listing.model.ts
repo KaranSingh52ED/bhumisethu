@@ -16,6 +16,7 @@ const listingKylItemSchema = new Schema(
     originalFileName: { type: String, required: true },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
+    predictedScore: { type: Number, default: null, min: 0, max: 100 },
     adminScore: { type: Number, default: null, min: 0, max: 100 },
     adminNote: { type: String, default: '' },
     reviewedAt: { type: Date, default: null },
