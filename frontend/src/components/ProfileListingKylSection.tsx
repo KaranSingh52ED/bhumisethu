@@ -151,8 +151,7 @@ export function ProfileListingKylSection({ token }: Props) {
               </span>
               {data ? (
                 <span className="profile-listing-kyl-agg">
-                  Avg. KYL {data.cumulativeScore != null ? data.cumulativeScore : '—'} ·{' '}
-                  Expected{' '}
+                  Avg. KYL {data.cumulativeScore != null ? data.cumulativeScore : '—'} · Expected{' '}
                   {data.predictedKylScore != null ? `${data.predictedKylScore}/100` : '—'} ·{' '}
                   {data.scoredDocCount} of {data.kylRequiredTotal ?? '—'} required approved
                 </span>

@@ -161,7 +161,8 @@ export function ListingDocumentsChecklist({ token, listingId }: Props) {
                     {reviewState !== 'approved' && sub.predictedScore != null ? (
                       <>
                         <br />
-                        Predicted score before admin approval: <strong>{sub.predictedScore}/100</strong>
+                        Predicted score before admin approval:{' '}
+                        <strong>{sub.predictedScore}/100</strong>
                       </>
                     ) : null}
                   </p>

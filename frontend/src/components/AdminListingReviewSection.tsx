@@ -404,7 +404,7 @@ export function AdminListingReviewSection({ token }: Props) {
                                                   ? String(doc.adminScore)
                                                   : doc.predictedScore != null
                                                     ? String(doc.predictedScore)
-                                                  : '80',
+                                                    : '80',
                                             }));
                                             setRejectNote((p) => ({ ...p, [listing.id]: '' }));
                                             setActionError('');
