@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
 import { env } from './env';
+
+// Force Google DNS to resolve MongoDB Atlas SRV records — local ISP DNS
+// servers sometimes actively refuse SRV lookups (ECONNREFUSED).
+// Safe to keep on Render/cloud since their DNS handles it correctly either way.
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 export const connectToDatabase = async (): Promise<void> => {
   if (!env.mongoUri) {
