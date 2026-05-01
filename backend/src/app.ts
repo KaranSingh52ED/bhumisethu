@@ -31,7 +31,8 @@ const corsOptions: cors.CorsOptions = {
 };
 
 // Handle OPTIONS preflight explicitly before any other middleware.
-app.options('*', cors(corsOptions));
+// Express 5 dropped the bare '*' wildcard — use a regex instead.
+app.options(/.*/, cors(corsOptions));
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
