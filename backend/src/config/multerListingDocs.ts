@@ -8,9 +8,8 @@ const allowedMimes = new Set([
   'image/gif',
 ]);
 
-// Vercel Hobby enforces a hard 4.5 MB request-body limit at the edge.
-// We set 4 MB here to leave headroom for multipart form boundaries/headers.
-const maxBytes = 4 * 1024 * 1024;
+// 10 MB — matches Cloudinary free-plan upload limit for images and raw files.
+const maxBytes = 10 * 1024 * 1024;
 
 export const listingDocumentUpload = multer({
   storage: multer.memoryStorage(),
