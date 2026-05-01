@@ -1,13 +1,4 @@
-import fs from 'fs';
-import path from 'path';
 import multer from 'multer';
-import { randomBytes } from 'crypto';
-
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
 
 const allowedMimes = new Set([
   'application/pdf',
@@ -17,22 +8,12 @@ const allowedMimes = new Set([
   'image/gif',
 ]);
 
-const maxBytes = 15 * 1024 * 1024;
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '';
-    const safeExt = ext.length <= 8 ? ext : '';
-    const name = `land-doc-${Date.now()}-${randomBytes(8).toString('hex')}${safeExt}`;
-    cb(null, name);
-  },
-});
+// Vercel Hobby enforces a hard 4.5 MB request-body limit at the edge.
+// We set 4 MB here to leave headroom for multipart form boundaries/headers.
+const maxBytes = 4 * 1024 * 1024;
 
 export const landDocumentUpload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: maxBytes },
   fileFilter: (_req, file, cb) => {
     if (allowedMimes.has(file.mimetype)) {
@@ -42,5 +23,3 @@ export const landDocumentUpload = multer({
     cb(new Error('Only PDF and image uploads are allowed.'));
   },
 });
-
-export const getUploadsDir = (): string => UPLOAD_DIR;

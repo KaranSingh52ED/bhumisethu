@@ -1,5 +1,3 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import {
@@ -11,8 +9,8 @@ import {
   isValidDocumentKey,
   isValidTypeForKey,
 } from '../data/documents';
-import { getUploadsDir } from '../config/multerLandDocs';
 import { listingDocumentUpload } from '../config/multerListingDocs';
+import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary';
 import {
   requireAuth,
   requireApproved,
@@ -537,34 +535,25 @@ router.post(
     const selectedType =
       typeof req.body?.selectedType === 'string' ? req.body.selectedType.trim() : '';
 
-    const cleanup = async () => {
-      if (req.file?.path) await fs.unlink(req.file.path).catch(() => undefined);
-    };
-
     if (!listingId) {
-      await cleanup();
       return res.status(400).json({ message: 'listingId is required.' });
     }
 
     const check = await assertListingOwner(listingId, googleId);
     if (!check.ok) {
-      await cleanup();
       return res.status(check.status).json({ message: check.message });
     }
 
     if (!documentKey || !isValidDocumentKey(documentKey)) {
-      await cleanup();
       return res.status(400).json({ message: 'Valid documentKey is required.' });
     }
 
     const entry = getCatalogEntryByKey(documentKey);
     if (!entry) {
-      await cleanup();
       return res.status(400).json({ message: 'Unknown document category.' });
     }
 
     if (!selectedType || !isValidTypeForKey(documentKey, selectedType)) {
-      await cleanup();
       return res.status(400).json({
         message: `selectedType must be one of: ${entry.allowedTypes.join(', ')}`,
       });
@@ -574,15 +563,23 @@ router.post(
       return res.status(400).json({ message: 'File is required (field name: file).' });
     }
 
-    const storedFileName = path.basename(req.file.filename || req.file.path);
-    const uploadsDir = getUploadsDir();
-    const absolutePath = path.join(uploadsDir, storedFileName);
-
     const kylBefore = kylMapToRecord(check.listing.kylDocuments);
     const existing = kylBefore[documentKey];
+
+    let cloudinaryResult: { secureUrl: string; publicId: string };
+    try {
+      cloudinaryResult = await uploadToCloudinary(
+        req.file.buffer,
+        req.file.mimetype,
+        'bhumisethu/listing-docs',
+        'listing-doc',
+      );
+    } catch {
+      return res.status(500).json({ message: 'Failed to upload file to storage.' });
+    }
+
     if (existing?.storedFileName) {
-      const oldPath = path.join(uploadsDir, path.basename(existing.storedFileName));
-      await fs.unlink(oldPath).catch(() => undefined);
+      await deleteFromCloudinary(existing.storedFileName, existing.mimeType);
     }
 
     const now = new Date();
@@ -594,7 +591,8 @@ router.post(
     });
     const newItem: ListingKylItem = {
       typeLabel: selectedType,
-      storedFileName,
+      storedFileName: cloudinaryResult.publicId,
+      fileUrl: cloudinaryResult.secureUrl,
       originalFileName: req.file.originalname,
       mimeType: req.file.mimetype,
       sizeBytes: req.file.size,
@@ -613,7 +611,7 @@ router.post(
     ).lean();
 
     if (!updated) {
-      await fs.unlink(absolutePath).catch(() => undefined);
+      await deleteFromCloudinary(cloudinaryResult.publicId, req.file.mimetype);
       return res.status(500).json({ message: 'Failed to save document record.' });
     }
 
@@ -661,19 +659,7 @@ router.get('/:listingId/documents/file/:documentKey', ...landOwnerChain, async (
     return res.status(404).json({ message: 'Document not found.' });
   }
 
-  const safeName = path.basename(item.storedFileName);
-  const filePath = path.join(getUploadsDir(), safeName);
-
-  res.setHeader('Content-Type', item.mimeType);
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename="${encodeURIComponent(item.originalFileName)}"`,
-  );
-  return res.sendFile(filePath, (err) => {
-    if (err && !res.headersSent) {
-      res.status(404).json({ message: 'File missing on server.' });
-    }
-  });
+  return res.redirect(item.fileUrl);
 });
 
 // ─── Admin: list all submitted listings ──────────────────────────────────────
@@ -782,19 +768,7 @@ router.get('/admin/:listingId/docs/file/:documentKey', ...adminChain, async (req
     return res.status(404).json({ message: 'Document not found.' });
   }
 
-  const safeName = path.basename(item.storedFileName);
-  const filePath = path.join(getUploadsDir(), safeName);
-
-  res.setHeader('Content-Type', item.mimeType);
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename="${encodeURIComponent(item.originalFileName)}"`,
-  );
-  return res.sendFile(filePath, (err) => {
-    if (err && !res.headersSent) {
-      res.status(404).json({ message: 'File missing on server.' });
-    }
-  });
+  return res.redirect(item.fileUrl);
 });
 
 // ─── Admin: approve or reject a listing document (single-step KYL review) ───

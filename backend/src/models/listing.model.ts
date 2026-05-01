@@ -12,7 +12,10 @@ const landCategories = [
 const listingKylItemSchema = new Schema(
   {
     typeLabel: { type: String, required: true },
+    /** Cloudinary public_id — used to delete the asset when replaced or removed. */
     storedFileName: { type: String, required: true },
+    /** Cloudinary secure URL — used to serve/redirect the file to clients. */
+    fileUrl: { type: String, required: true },
     originalFileName: { type: String, required: true },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },

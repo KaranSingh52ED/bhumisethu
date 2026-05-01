@@ -13,4 +13,7 @@ export const env = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   jwtSecret: process.env.JWT_SECRET ?? 'change-me-in-production',
   mongoUri: process.env.MONGO_URI ?? '',
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY ?? '',
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? '',
 };

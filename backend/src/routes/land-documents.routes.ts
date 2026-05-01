@@ -1,5 +1,3 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { Router } from 'express';
 import {
   getCatalogEntryByKey,
@@ -7,7 +5,8 @@ import {
   isValidDocumentKey,
   isValidTypeForKey,
 } from '../data/documents';
-import { getUploadsDir, landDocumentUpload } from '../config/multerLandDocs';
+import { landDocumentUpload } from '../config/multerLandDocs';
+import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary';
 import {
   requireAuth,
   requireApproved,
@@ -50,6 +49,7 @@ type SubmissionLean = {
   typeLabel: string;
   optional: boolean;
   storedFileName: string;
+  fileUrl: string;
   originalFileName: string;
   mimeType: string;
   sizeBytes: number;
@@ -127,24 +127,15 @@ router.post(
       typeof req.body?.selectedType === 'string' ? req.body.selectedType.trim() : '';
 
     if (!documentKey || !isValidDocumentKey(documentKey)) {
-      if (req.file?.path) {
-        await fs.unlink(req.file.path).catch(() => undefined);
-      }
       return res.status(400).json({ message: 'Valid documentKey is required.' });
     }
 
     const entry = getCatalogEntryByKey(documentKey);
     if (!entry) {
-      if (req.file?.path) {
-        await fs.unlink(req.file.path).catch(() => undefined);
-      }
       return res.status(400).json({ message: 'Unknown document type.' });
     }
 
     if (!selectedType || !isValidTypeForKey(documentKey, selectedType)) {
-      if (req.file?.path) {
-        await fs.unlink(req.file.path).catch(() => undefined);
-      }
       return res.status(400).json({
         message: `selectedType must be one of: ${entry.allowedTypes.join(', ')}`,
       });
@@ -154,9 +145,18 @@ router.post(
       return res.status(400).json({ message: 'File is required (field name: file).' });
     }
 
-    const storedFileName = path.basename(req.file.filename || req.file.path);
-    const uploadsDir = getUploadsDir();
-    const absolutePath = path.join(uploadsDir, storedFileName);
+    let cloudinaryResult: { secureUrl: string; publicId: string };
+    try {
+      cloudinaryResult = await uploadToCloudinary(
+        req.file.buffer,
+        req.file.mimetype,
+        'bhumisethu/land-docs',
+        'land-doc',
+      );
+    } catch {
+      return res.status(500).json({ message: 'Failed to upload file to storage.' });
+    }
+
     const predictedScore = predictDocumentScore({
       documentKey,
       selectedType,
@@ -170,11 +170,9 @@ router.post(
     }).lean();
 
     if (existing?.storedFileName) {
-      const oldPath = path.join(uploadsDir, path.basename(existing.storedFileName));
-      await fs.unlink(oldPath).catch(() => undefined);
+      await deleteFromCloudinary(existing.storedFileName, existing.mimeType);
     }
 
-    // New upload or replace: always reset workflow so admins re-review (including after prior approval).
     const doc = await LandOwnerDocumentModel.findOneAndUpdate(
       { landOwnerGoogleId: googleId, documentKey },
       {
@@ -183,7 +181,8 @@ router.post(
         category: entry.category,
         typeLabel: selectedType,
         optional: entry.optional,
-        storedFileName,
+        storedFileName: cloudinaryResult.publicId,
+        fileUrl: cloudinaryResult.secureUrl,
         originalFileName: req.file.originalname,
         mimeType: req.file.mimetype,
         sizeBytes: req.file.size,
@@ -197,7 +196,7 @@ router.post(
     ).lean();
 
     if (!doc) {
-      await fs.unlink(absolutePath).catch(() => undefined);
+      await deleteFromCloudinary(cloudinaryResult.publicId, req.file.mimetype);
       return res.status(500).json({ message: 'Failed to save document record.' });
     }
 
@@ -212,6 +211,10 @@ router.post(
   },
 );
 
+/**
+ * Redirect clients directly to the Cloudinary-hosted file.
+ * Auth is still enforced so only the owner or an admin can access the URL.
+ */
 router.get('/file/:submissionId', requireAuth, requireRegistrationComplete, async (req, res) => {
   const { submissionId } = req.params;
   const user = req.user!;
@@ -231,21 +234,7 @@ router.get('/file/:submissionId', requireAuth, requireRegistrationComplete, asyn
     return res.status(403).json({ message: 'Your account is pending admin approval.' });
   }
 
-  const safeName = path.basename(doc.storedFileName);
-  const filePath = path.join(getUploadsDir(), safeName);
-
-  res.setHeader('Content-Type', doc.mimeType);
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename="${encodeURIComponent(doc.originalFileName)}"`,
-  );
-  return res.sendFile(filePath, (err) => {
-    if (err) {
-      if (!res.headersSent) {
-        res.status(404).json({ message: 'File missing on server.' });
-      }
-    }
-  });
+  return res.redirect(doc.fileUrl);
 });
 
 router.get(

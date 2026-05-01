@@ -4,7 +4,10 @@
 
 export type ListingKylItem = {
   typeLabel: string;
+  /** Cloudinary public_id */
   storedFileName: string;
+  /** Cloudinary secure URL */
+  fileUrl: string;
   originalFileName: string;
   mimeType: string;
   sizeBytes: number;
